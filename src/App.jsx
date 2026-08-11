@@ -6,8 +6,10 @@ import viteLogo from "./assets/vite.svg";
 import heroImg from "./assets/hero.png";
 import "./App.css";
 import Meddelande from "./components/timer";
-import Register from "./pages/Register.jsx";
-import Login from "./pages/Login.jsx";
+import Register from "./components/register.jsx";
+import Login from "./components/login.jsx";
+import accountCard from "./components/accountCard.jsx";
+import AccountCard from "./components/accountCard.jsx";
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(null);
@@ -41,19 +43,13 @@ function App() {
         element={
           <>
             <h1>Pomodoro</h1>
-            {loggedIn && <h2>Ya logged in!</h2>}
             <Meddelande />
             <br />
-            <a href="/pomodoro/register">Register</a>
+            <AccountCard></AccountCard>
             <br />
-            {loggedIn === false && <a href="/pomodoro/login">Log in</a>}
-            {loggedIn && <button onClick={handleLogout}>Log it on out!</button>}
           </>
         }
       />
-
-      <Route path="/register" element={<Register />} />
-      <Route path="/login" element={<Login />} />
     </Routes>
   );
 }
