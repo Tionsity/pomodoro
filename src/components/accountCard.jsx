@@ -12,7 +12,8 @@ function AccountCard() {
   const [usernameInput, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [emailInput, setEmail] = useState("");
-  const login = useLogin(usernameInput, password);
+  const [stayLoggedIn, setStayLoggedIn] = useState(false);
+  const login = useLogin(usernameInput, password, stayLoggedIn);
   const register = useRegister(emailInput, usernameInput, password);
 
   let handleSubmit;
@@ -78,6 +79,18 @@ function AccountCard() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
+        <br />
+        {accountMode === "login" && (
+          <div className="stayloggedincheckbox">
+            <p>Stay logged in</p>
+            <input
+              type="checkbox"
+              className="stayloggedin"
+              checked={stayLoggedIn}
+              onChange={(event) => setStayLoggedIn(event.target.checked)}
+            />
+          </div>
+        )}
         <br />
         <button type="submit">{buttonText}</button>
       </form>

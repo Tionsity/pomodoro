@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import argon2 from "argon2";
+import { ObjectId } from "mongodb";
 import { connectToDb } from "./db.js";
 import session from "express-session";
 import MongoStore from "connect-mongo";
@@ -23,10 +24,10 @@ app.use(
 
     store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI,
+      ttl: 60, //* 60 * 24,
     }),
 
     cookie: {
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 dagar
       httpOnly: true,
     },
   }),
@@ -84,7 +85,7 @@ app.post("/api/check-user", async (req, res) => {
 });
 
 app.post("/api/login", async (req, res) => {
-  let { usernameInput, password } = req.body;
+  let { usernameInput, password, stayLoggedIn } = req.body;
 
   usernameInput = usernameInput.toLowerCase();
 
@@ -110,6 +111,10 @@ app.post("/api/login", async (req, res) => {
   if (passwordIsCorrect) {
     req.session.userId = user._id;
 
+    if (stayLoggedIn) {
+      req.session.cookie.maxAge = 1000 * 60 * 60 * 24 * 90;
+    }
+
     return res.json({
       loginSuccessful: true,
     });
@@ -120,10 +125,17 @@ app.post("/api/login", async (req, res) => {
   });
 });
 
-app.get("/api/me", (req, res) => {
+app.get("/api/me", async (req, res) => {
   if (req.session.userId) {
+    const user = await db
+      .collection("users")
+      .findOne({ _id: new ObjectId(req.session.userId) });
+    if (!user) {
+      return res.json({ loggedIn: false });
+    }
     return res.json({
       loggedIn: true,
+      user: user.username,
     });
   }
 

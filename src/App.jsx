@@ -14,6 +14,8 @@ import AccountCard from "./components/accountCard.jsx";
 function App() {
   const [loggedIn, setLoggedIn] = useState(null);
 
+  let loggedInMessage = "Ye be not logged in";
+
   useEffect(() => {
     async function checkLogin() {
       const response = await fetch("http://localhost:3001/api/me", {
@@ -23,10 +25,17 @@ function App() {
       const data = await response.json();
 
       setLoggedIn(data.loggedIn);
+      setUsername(data.user);
     }
 
     checkLogin();
   }, []);
+
+  const [username, setUsername] = useState("");
+  if (loggedIn === true) {
+    loggedInMessage = username;
+  }
+  console.log("Login? " + loggedIn);
 
   async function handleLogout() {
     const response = await fetch("http://localhost:3001/api/logout", {
@@ -43,6 +52,7 @@ function App() {
         element={
           <>
             <h1>Pomodoro</h1>
+            <p>{loggedInMessage}</p>
             <Meddelande />
             <br />
             <AccountCard></AccountCard>

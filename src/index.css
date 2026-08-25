@@ -124,6 +124,12 @@ input[type="checkbox"] {
   visibility: hidden;
 }
 
+input[type="checkbox"].stayloggedin {
+  visibility: visible;
+  height: 15px;
+  width: 15px;
+}
+
 .switch {
   cursor: pointer;
   text-indent: -9999px;
@@ -160,4 +166,8 @@ body {
   justify-content: center;
   align-items: center;
   height: 100vh;
+}
+
+.stayloggedincheckbox {
+  display: flex;
 }
