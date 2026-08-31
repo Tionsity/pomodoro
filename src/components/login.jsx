@@ -8,7 +8,6 @@ export function useLogin(
 ) {
   async function handleSubmit(event) {
     event.preventDefault();
-    console.log("Stay logged in: " + stayLoggedIn);
     const response = await fetch("http://localhost:3001/api/login", {
       method: "POST",
       credentials: "include",
@@ -27,6 +26,7 @@ export function useLogin(
       alert("Dat username does not exist!");
     } else if (data.loginSuccessful) {
       alert("Ya in!");
+      window.location.reload();
     } else {
       alert("Wrong Password!");
     }

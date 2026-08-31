@@ -116,6 +116,7 @@ code {
   height: 500px;
   align-self: center;
   color: black;
+  margin-top: 200px;
 }
 
 input[type="checkbox"] {
@@ -170,4 +171,32 @@ body {
 
 .stayloggedincheckbox {
   display: flex;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+}
+
+.projectSelector {
+  height: 300px;
+  background-color: green;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+}
+
+.projectCard {
+  width: 100px;
+  height: 100px;
+  background-color: blue;
+}
+
+.projectButtons {
+  display: flex;
+  justify-content: space-between;
+}
+
+.journalLink {
+  color: white;
 }

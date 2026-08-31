@@ -144,6 +144,16 @@ app.get("/api/me", async (req, res) => {
   });
 });
 
+app.get("/api/projects", async (req, res) => {
+  if (req.session.userId) {
+    const projects = await db
+      .collection("projects")
+      .find({ userid: new ObjectId(req.session.userId) })
+      .toArray();
+    return res.json(projects);
+  }
+});
+
 app.post("/api/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
