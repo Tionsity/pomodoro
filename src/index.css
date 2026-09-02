@@ -200,3 +200,16 @@ body {
 .journalLink {
   color: white;
 }
+
+.smallSettingsCard {
+  height: 100px;
+  background-color: beige;
+}
+
+.underlineableButton {
+  background-color: rgb(95, 214, 95);
+}
+
+.underlineableButton.selected {
+  background-color: rgb(129, 95, 214);
+}

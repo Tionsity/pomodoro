@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import ding from "/src/assets/sounds/ding.mp3";
-import timer from "/src/assets/sounds/timer.mp3";
+import ding from "../assets/sounds/ding/ding_pm_end.mp3";
+import timer from "../assets/sounds/timer.mp3";
 
 export default function Timer() {
   const startText = "Start Pomodoro";

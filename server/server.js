@@ -98,8 +98,6 @@ app.post("/api/login", async (req, res) => {
     },
   });
 
-  console.log("User found:", user);
-
   if (!user) {
     return res.json({
       noUser: true,
@@ -165,6 +163,30 @@ app.post("/api/logout", (req, res) => {
     return res.json({
       loggedIn: false,
     });
+  });
+});
+
+app.get("/api/settings", async (req, res) => {
+  if (req.session.userId) {
+    const settings = await db
+      .collection("settings")
+      .findOne({ userid: new ObjectId(req.session.userId) });
+    return res.json(settings);
+  }
+});
+
+app.post("/api/settings", async (req, res) => {
+  let { chosenSound } = req.body;
+
+  await db
+    .collection("settings")
+    .updateOne(
+      { userid: new ObjectId(req.session.userId) },
+      { $set: { chosenSound } },
+    );
+
+  return res.json({
+    chosenSound: chosenSound,
   });
 });
 
