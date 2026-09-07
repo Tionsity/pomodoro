@@ -213,3 +213,14 @@ body {
 .underlineableButton.selected {
   background-color: rgb(129, 95, 214);
 }
+
+.breakChoise {
+  display: flex;
+  justify-content: center;
+}
+
+input.breakBox {
+  height: 15px;
+  width: 15px;
+  visibility: visible;
+}

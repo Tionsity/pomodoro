@@ -5,8 +5,56 @@ import { ObjectId } from "mongodb";
 import { connectToDb } from "./db.js";
 import session from "express-session";
 import MongoStore from "connect-mongo";
+import { Resend } from "resend";
+import { randomInt } from "crypto";
 
 const app = express();
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+function checkValidity(username, email) {
+  let wrongUsername;
+  let wrongEmail;
+  if (username !== undefined) {
+    const validUsername = /^[a-zA-Z0-9_]+$/.test(username);
+    if (!validUsername) {
+      wrongUsername = true;
+    } else {
+      wrongUsername = false;
+    }
+  }
+  if (email !== undefined) {
+    const validEmail = /^[a-zA-Z0-9_@.]+$/.test(email);
+    if (!validEmail) {
+      wrongEmail = true;
+    } else {
+      wrongEmail = false;
+    }
+  }
+  return { wrongUsername, wrongEmail };
+}
+
+function emailCode() {
+  return randomInt(100000, 1000000);
+}
+
+async function sendEmail(email, code) {
+  const { data, error } = await resend.emails.send({
+    from: "Pomodoro <contact@tionsity.dev>",
+    to: email,
+    subject: "Ye Olde Code",
+    html: `<p>Your verification code is <strong>${code}</strong></p>`,
+  });
+
+  let errorHappened = false;
+
+  if (error) {
+    console.log(error);
+    errorHappened = true;
+  }
+
+  return { data, errorHappened };
+}
 
 app.use(
   cors({
@@ -35,13 +83,19 @@ app.use(
 
 const db = await connectToDb();
 
+async function checkUser(user, value) {
+  const userSearch = await db.collection("users").findOne({ [user]: value });
+  return userSearch;
+}
+
 app.post("/api/check-user", async (req, res) => {
   let { usernameInput, emailInput, password } = req.body;
+
   usernameInput = usernameInput.toLowerCase();
   emailInput = emailInput.toLowerCase();
-  const validUsername = /^[a-zA-Z0-9_]+$/.test(usernameInput);
-  const validEmail = /^[a-zA-Z0-9_@.]+$/.test(emailInput);
-  if (!validUsername) {
+  const validity = checkValidity(usernameInput, emailInput);
+
+  if (validity.wrongUsername) {
     return res.json({
       usernameExists: false,
       emailExists: false,
@@ -49,7 +103,7 @@ app.post("/api/check-user", async (req, res) => {
       accountCreated: false,
     });
   }
-  if (!validEmail) {
+  if (validity.wrongEmail) {
     return res.json({
       usernameExists: false,
       emailExists: false,
@@ -58,12 +112,23 @@ app.post("/api/check-user", async (req, res) => {
       accountCreated: false,
     });
   }
-  const usernameExists = await db.collection("users").findOne({
-    username: usernameInput,
-  });
-  const emailExists = await db.collection("users").findOne({
-    email: emailInput,
-  });
+
+  let usernameExists = null;
+  let emailExists = null;
+
+  const user = await checkUser("username", usernameInput);
+  const email = await checkUser("email", emailInput);
+
+  if (user === null) {
+    usernameExists = false;
+  } else {
+    usernameExists = true;
+  }
+  if (email === null) {
+    emailExists = false;
+  } else {
+    emailExists = true;
+  }
 
   if (!usernameExists && !emailExists && validUsername) {
     const passwordHash = await argon2.hash(password);
@@ -83,6 +148,144 @@ app.post("/api/check-user", async (req, res) => {
     accountCreated: !usernameExists && !emailExists,
   });
 });
+
+//Function to update username, email and password for user
+app.patch("/api/user", async (req, res) => {
+  let {
+    newUsername,
+    newPassword,
+    newEmail,
+    oldPassword,
+    emailCodeInput,
+    codeEntered,
+  } = req.body;
+  //Checking to see if user is logged in
+  if (req.session.userId) {
+    const user = await db
+      .collection("users")
+      .findOne({ _id: new ObjectId(req.session.userId) });
+    if (!user) {
+      return res.json({ loggedIn: false });
+    }
+    //Using Argon to check is password is correct and storing it in a variable
+    const passwordIsCorrect = await argon2.verify(
+      user.passwordHash,
+      oldPassword,
+    );
+
+    //Returning a variable as true if password is not correct. User is not allowed to proceed if password is incorrect
+    if (!passwordIsCorrect) {
+      return res.json({ incorrectPassword: true });
+    } else {
+      //Checking to see if user has entered the verification code
+      if (codeEntered) {
+        //Checking if the session authentification session is running
+        if (!req.session.auth) {
+          return res.json({ sessionError: true });
+        } else {
+          //Checking if user has entered code within the timeframe
+          if (Date.now() > req.session.auth.expiresAt) {
+            delete req.session.auth;
+            return res.json({ expired: true });
+          } else {
+            //Checking if user has exeeded the number of attempts at entering the correct code
+            if (req.session.auth.codeAttempts >= 5) {
+              delete req.session.auth;
+              return res.json({ maxAttempts: true });
+            } else {
+              //Checking if correct code is entered
+              if (Number(emailCodeInput) !== req.session.auth.code) {
+                req.session.auth.codeAttempts++;
+                return res.json({
+                  incorrectCode: true,
+                  attempts: req.session.auth.codeAttempts,
+                });
+              } else {
+                //Storing updates in an object
+                let updates = {};
+                //Checking for non allowed characters in user's input
+                const validity = checkValidity(newUsername, newEmail);
+                if (validity.wrongUsername || validity.wrongEmail) {
+                  return res.json({ wrongCharacters: true });
+                }
+
+                //Making sure user input is not indefined
+                if (newUsername !== undefined) {
+                  //Checking if user enters the same username as the current username
+                  if (newUsername === user.username) {
+                    return res.json({ currentUsername: true });
+                  } else {
+                    //Checking if the new username already exists
+                    const usernameCheck = await checkUser(
+                      "username",
+                      newUsername,
+                    );
+                    if (usernameCheck !== null) {
+                      return res.json({ usernameExists: true });
+                    } else {
+                      //Storing username in variable
+                      updates.username = newUsername;
+                    }
+                  }
+                }
+
+                //Same logic as username
+                if (newEmail !== undefined) {
+                  if (newEmail === user.email) {
+                    return res.json({ currentEmail: true });
+                  } else {
+                    const emailCheck = await checkUser("email", newEmail);
+                    if (emailCheck !== null) {
+                      return res.json({ emailExists: true });
+                    } else {
+                      updates.email = newEmail;
+                    }
+                  }
+                }
+                //Updating password with Argon
+                if (newPassword !== undefined) {
+                  const newPasswordHash = await argon2.hash(newPassword);
+                  updates.passwordHash = newPasswordHash;
+                }
+
+                //Sending updates to DB
+                await db.collection("users").updateOne(
+                  { _id: new ObjectId(req.session.userId) },
+                  {
+                    $set: updates,
+                  },
+                );
+                delete req.session.auth;
+                return res.json({ userUpdates: true });
+              }
+            }
+          }
+        }
+      } else {
+        req.session.auth = {
+          //Generating one time code
+          code: emailCode(),
+          //Setting time of expiery for code
+          expiresAt: Date.now() + 1000 * 60 * 10,
+          //Putting number of attempts in variable
+          codeAttempts: 0,
+        };
+        //Sending verification email to user, checking for errors and deleting session if errors
+        const emailResult = await sendEmail(user.email, req.session.auth.code);
+        if (!emailResult.errorHappened) {
+          return res.json({ codeSent: true });
+        } else {
+          delete req.session.auth;
+          return res.json({ emailError: true });
+        }
+      }
+    }
+  }
+  //Returning variable if user is not logged in
+  return res.json({ loggedIn: false });
+});
+
+app.delete("/api/user", async (req, res) => {});
 
 app.post("/api/login", async (req, res) => {
   let { usernameInput, password, stayLoggedIn } = req.body;
@@ -176,17 +379,18 @@ app.get("/api/settings", async (req, res) => {
 });
 
 app.post("/api/settings", async (req, res) => {
-  let { chosenSound } = req.body;
+  let { chosenSound, breakLong } = req.body;
 
   await db
     .collection("settings")
     .updateOne(
       { userid: new ObjectId(req.session.userId) },
-      { $set: { chosenSound } },
+      { $set: { chosenSound, breakLong } },
     );
 
   return res.json({
     chosenSound: chosenSound,
+    breakLong: breakLong,
   });
 });
 

@@ -3,29 +3,42 @@ import { AuthContext } from "../context/AuthContext";
 import playSound from "../helpers/playSound.js";
 import { stopSound } from "../helpers/playSound.js";
 
-function SmallSettingsCard({ openSetting, chosenSound, setchosenSound }) {
+function SmallSettingsCard({
+  openSetting,
+  chosenSound,
+  setchosenSound,
+  breakLong,
+  setBreakLong,
+}) {
   const startTestButtonText = "Test Sound";
   const [testButtonText, setTestButtonText] = useState(startTestButtonText);
   const [testButtonStarted, setTestButtonStarted] = useState(false);
-  const [settings, setSettings] = useState([]);
-  async function userSettings() {
-    const response = await fetch("http://localhost:3001/api/settings", {
-      credentials: "include",
-    });
-    const data = await response.json();
+  //   const [settings, setSettings] = useState(null);
 
-    setSettings(data);
-  }
+  //   async function userSettings() {
+  //     const response = await fetch("http://localhost:3001/api/settings", {
+  //       credentials: "include",
+  //     });
+  //     const data = await response.json();
 
-  useEffect(() => {
-    userSettings();
-  }, []);
+  //     setSettings(data);
+  //   }
 
-  useEffect(() => {
-    if (settings.chosenSound) {
-      setchosenSound(settings.chosenSound);
-    }
-  }, [settings]);
+  //   useEffect(() => {
+  //     userSettings();
+  //   }, []);
+
+  //   useEffect(() => {
+  //     if (settings) {
+  //       if (setchosenSound) {
+  //         setchosenSound(settings.chosenSound);
+  //       }
+
+  //       if (setBreakLong) {
+  //         setBreakLong(settings.breakLong);
+  //       }
+  //     }
+  //   }, [settings]);
 
   if (openSetting === "sound") {
     let testSounds = {
@@ -47,13 +60,6 @@ function SmallSettingsCard({ openSetting, chosenSound, setchosenSound }) {
       setTestButtonStarted(false);
     }
 
-    // async function testButton() {
-    //   if (!testButtonStarted) {
-    //     soundPlaying()
-    //   } else {
-    //     stopSound();
-    //     soundPlaying()
-    // }
     return (
       <div className="smallSettingsCard">
         <h4>Which set of sounds would you prefer?</h4>
@@ -106,6 +112,16 @@ function SmallSettingsCard({ openSetting, chosenSound, setchosenSound }) {
       <div className="smallSettingsCard">
         <h4>Include a long break or nah?</h4>
         <p>(This option gives you a break of 15 minutes every 4 Pomodoros)</p>
+        <div className="breakChoise">
+          <p>Yes</p>
+          <input
+            className="breakBox"
+            type="checkbox"
+            checked={breakLong}
+            onChange={(event) => setBreakLong(event.target.checked)}
+          />
+          <p>No</p>
+        </div>
       </div>
     );
   }
@@ -115,6 +131,7 @@ function SmallSettingsCard({ openSetting, chosenSound, setchosenSound }) {
 
 function SettingsCard() {
   const [chosenSound, setchosenSound] = useState("");
+  const [breakLong, setBreakLong] = useState(false);
   async function submitSettings(event) {
     event.preventDefault();
     const response = await fetch("http://localhost:3001/api/settings", {
@@ -125,9 +142,31 @@ function SettingsCard() {
       },
       body: JSON.stringify({
         chosenSound,
+        breakLong,
       }),
     });
   }
+  const [settings, setSettings] = useState(null);
+
+  async function userSettings() {
+    const response = await fetch("http://localhost:3001/api/settings", {
+      credentials: "include",
+    });
+    const data = await response.json();
+
+    setSettings(data);
+  }
+
+  useEffect(() => {
+    userSettings();
+  }, []);
+
+  useEffect(() => {
+    if (settings) {
+      setchosenSound(settings.chosenSound);
+      setBreakLong(settings.breakLong);
+    }
+  }, [settings]);
 
   const { handleLogout } = useContext(AuthContext);
 
@@ -143,13 +182,25 @@ function SettingsCard() {
       <>
         <h2>Dis be da account settings</h2>
         <br />
+        <p>Change username</p>
+        <p>Change E-mail</p>
         <p>Change password</p>
         <p>Delete account</p>
-        <p>Change E-mail</p>
-        <p>Change username</p>
         <br />
-        <button onClick={(event) => setaccountSettingsOpen(false)}>
+        <button
+          onClick={(event) => {
+            setaccountSettingsOpen(false);
+            submitSettings(event);
+            setOpenSetting(null);
+          }}>
           Save changes
+        </button>
+        <button
+          onClick={() => {
+            setOpenSetting(null);
+            setaccountSettingsOpen(false);
+          }}>
+          Discard changes
         </button>
       </>
     );
@@ -169,17 +220,30 @@ function SettingsCard() {
         <br />
         <button onClick={() => setOpenSetting("break")}>Break settings</button>
         {openSetting === "break" && (
-          <SmallSettingsCard openSetting={openSetting} />
+          <SmallSettingsCard
+            openSetting={openSetting}
+            breakLong={breakLong}
+            setBreakLong={setBreakLong}
+          />
         )}
         <br />
         <br />
         <button
           onClick={(event) => {
             submitSettings(event);
-
+            setOpenSetting(null);
             setpomodoroSettingsOpen(false);
           }}>
           Save changes
+        </button>
+        <button
+          onClick={() => {
+            setOpenSetting(null);
+            setchosenSound(settings.chosenSound);
+            setBreakLong(settings.breakLong);
+            setpomodoroSettingsOpen(false);
+          }}>
+          Discard changes
         </button>
       </>
     );
