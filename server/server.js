@@ -35,13 +35,14 @@ function checkValidity(username, email) {
 }
 
 function emailCode() {
-  return randomInt(100000, 1000000);
+  // return randomInt(100000, 1000000);
+  return 123456;
 }
 
 async function sendEmail(email, code) {
   const { data, error } = await resend.emails.send({
     from: "Pomodoro <contact@tionsity.dev>",
-    to: email,
+    to: "naifddqn@sharklasers.com",
     subject: "Ye Olde Code",
     html: `<p>Your verification code is <strong>${code}</strong></p>`,
   });
@@ -72,7 +73,7 @@ app.use(
 
     store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI,
-      ttl: 60, //* 60 * 24,
+      ttl: 60 * 60 * 24,
     }),
 
     cookie: {
@@ -130,7 +131,7 @@ app.post("/api/check-user", async (req, res) => {
     emailExists = true;
   }
 
-  if (!usernameExists && !emailExists && validUsername) {
+  if (!usernameExists && !emailExists) {
     const passwordHash = await argon2.hash(password);
     await db.collection("users").insertOne({
       username: usernameInput,
@@ -158,134 +159,215 @@ app.patch("/api/user", async (req, res) => {
     oldPassword,
     emailCodeInput,
     codeEntered,
+    cancelAuth,
   } = req.body;
+  if (cancelAuth) {
+    delete req.session.auth;
+  }
   //Checking to see if user is logged in
   if (req.session.userId) {
     const user = await db
       .collection("users")
       .findOne({ _id: new ObjectId(req.session.userId) });
+
     if (!user) {
       return res.json({ loggedIn: false });
     }
-    //Using Argon to check is password is correct and storing it in a variable
-    const passwordIsCorrect = await argon2.verify(
-      user.passwordHash,
-      oldPassword,
-    );
 
-    //Returning a variable as true if password is not correct. User is not allowed to proceed if password is incorrect
-    if (!passwordIsCorrect) {
-      return res.json({ incorrectPassword: true });
-    } else {
-      //Checking to see if user has entered the verification code
-      if (codeEntered) {
-        //Checking if the session authentification session is running
-        if (!req.session.auth) {
-          return res.json({ sessionError: true });
+    async function dbUpdate(update) {
+      await db.collection("users").updateOne(
+        { _id: new ObjectId(req.session.userId) },
+        {
+          $set: update,
+        },
+      );
+      delete req.session.auth;
+    }
+
+    //Starting the update process if the email code is verified
+    if (req.session.auth?.codeVerified) {
+      //Checking for non allowed characters in user's input
+      const validity = checkValidity(newUsername, newEmail);
+
+      if (validity.wrongUsername || validity.wrongEmail) {
+        return res.json({ wrongCharacters: true });
+      }
+
+      //Making sure user input is not undefined
+      if (newUsername !== undefined) {
+        //Checking if user enters the same username as the current username
+        if (newUsername === user.username) {
+          return res.json({ currentValue: true });
         } else {
-          //Checking if user has entered code within the timeframe
-          if (Date.now() > req.session.auth.expiresAt) {
-            delete req.session.auth;
-            return res.json({ expired: true });
+          //Checking if the new username already exists
+          const usernameCheck = await checkUser("username", newUsername);
+
+          if (usernameCheck !== null) {
+            return res.json({ usernameExists: true });
           } else {
-            //Checking if user has exeeded the number of attempts at entering the correct code
-            if (req.session.auth.codeAttempts >= 5) {
+            await dbUpdate({ username: newUsername });
+            return res.json({ valueUpdated: true });
+          }
+        }
+      }
+
+      //Same logic as username
+      if (newEmail !== undefined) {
+        if (newEmail === user.email) {
+          return res.json({ currentValue: true });
+        } else {
+          const emailCheck = await checkUser("email", newEmail);
+
+          if (emailCheck !== null) {
+            return res.json({ emailExists: true });
+          } else {
+            await dbUpdate({ email: newEmail });
+            return res.json({ valueUpdated: true });
+          }
+        }
+      }
+
+      //Storing new password in variable with Argon
+      if (newPassword !== undefined) {
+        const isOldPassword = await argon2.verify(
+          user.passwordHash,
+          newPassword,
+        );
+        if (isOldPassword) {
+          return res.json({ currentValue: true });
+        } else {
+          const newPasswordHash = await argon2.hash(newPassword);
+          await dbUpdate({ passwordHash: newPasswordHash });
+          return res.json({ valueUpdated: true });
+        }
+      }
+    } else {
+      //Using Argon to check if password is correct and storing it in a variable
+      const passwordIsCorrect = await argon2.verify(
+        user.passwordHash,
+        oldPassword,
+      );
+      console.log("passwordIsCorrect:", passwordIsCorrect);
+
+      //Returning a variable as true if password is not correct. User is not allowed to proceed if password is incorrect
+      if (!passwordIsCorrect) {
+        return res.json({ incorrectPassword: true });
+      } else {
+        //Checking to see if user has entered the verification code
+        if (codeEntered) {
+          //Checking if the authentification session is running
+          if (!req.session.auth) {
+            return res.json({ sessionError: true });
+          } else {
+            //Checking if user has entered code within the timeframe
+            if (Date.now() > req.session.auth.expiresAt) {
               delete req.session.auth;
-              return res.json({ maxAttempts: true });
+              return res.json({ expired: true });
             } else {
-              //Checking if correct code is entered
-              if (Number(emailCodeInput) !== req.session.auth.code) {
-                req.session.auth.codeAttempts++;
-                return res.json({
-                  incorrectCode: true,
-                  attempts: req.session.auth.codeAttempts,
-                });
-              } else {
-                //Storing updates in an object
-                let updates = {};
-                //Checking for non allowed characters in user's input
-                const validity = checkValidity(newUsername, newEmail);
-                if (validity.wrongUsername || validity.wrongEmail) {
-                  return res.json({ wrongCharacters: true });
-                }
-
-                //Making sure user input is not indefined
-                if (newUsername !== undefined) {
-                  //Checking if user enters the same username as the current username
-                  if (newUsername === user.username) {
-                    return res.json({ currentUsername: true });
-                  } else {
-                    //Checking if the new username already exists
-                    const usernameCheck = await checkUser(
-                      "username",
-                      newUsername,
-                    );
-                    if (usernameCheck !== null) {
-                      return res.json({ usernameExists: true });
-                    } else {
-                      //Storing username in variable
-                      updates.username = newUsername;
-                    }
-                  }
-                }
-
-                //Same logic as username
-                if (newEmail !== undefined) {
-                  if (newEmail === user.email) {
-                    return res.json({ currentEmail: true });
-                  } else {
-                    const emailCheck = await checkUser("email", newEmail);
-                    if (emailCheck !== null) {
-                      return res.json({ emailExists: true });
-                    } else {
-                      updates.email = newEmail;
-                    }
-                  }
-                }
-                //Updating password with Argon
-                if (newPassword !== undefined) {
-                  const newPasswordHash = await argon2.hash(newPassword);
-                  updates.passwordHash = newPasswordHash;
-                }
-
-                //Sending updates to DB
-                await db.collection("users").updateOne(
-                  { _id: new ObjectId(req.session.userId) },
-                  {
-                    $set: updates,
-                  },
-                );
+              //Checking if user has exeeded the number of attempts at entering the correct code
+              if (req.session.auth.codeAttempts >= 5) {
                 delete req.session.auth;
-                return res.json({ userUpdates: true });
+                return res.json({ maxAttempts: true });
+              } else {
+                //Checking if correct code is entered
+                if (Number(emailCodeInput) !== req.session.auth.code) {
+                  req.session.auth.codeAttempts++;
+
+                  return res.json({
+                    incorrectCode: true,
+                    attempts: req.session.auth.codeAttempts,
+                    maxAttempts: 5,
+                  });
+                } else {
+                  //Setting the email code as verified
+                  req.session.auth = {
+                    codeVerified: true,
+                    expiresAt: Date.now() + 1000 * 60 * 10,
+                  };
+                  return res.json({ codeVerified: true });
+                }
               }
             }
           }
-        }
-      } else {
-        req.session.auth = {
-          //Generating one time code
-          code: emailCode(),
-          //Setting time of expiery for code
-          expiresAt: Date.now() + 1000 * 60 * 10,
-          //Putting number of attempts in variable
-          codeAttempts: 0,
-        };
-        //Sending verification email to user, checking for errors and deleting session if errors
-        const emailResult = await sendEmail(user.email, req.session.auth.code);
-        if (!emailResult.errorHappened) {
-          return res.json({ codeSent: true });
         } else {
-          delete req.session.auth;
-          return res.json({ emailError: true });
+          req.session.auth = {
+            //Generating one time code
+            code: emailCode(),
+
+            //Setting time of expiery for code
+            expiresAt: Date.now() + 1000 * 60 * 10,
+
+            //Putting number of attempts in variable
+            codeAttempts: 0,
+
+            //Checking if code is verified
+            codeVerified: false,
+          };
+
+          //Sending verification email to user, checking for errors and deleting session if errors
+          const emailResult = await sendEmail(
+            user.email,
+            req.session.auth.code,
+          );
+
+          if (!emailResult.errorHappened) {
+            return res.json({ codeSent: true });
+          } else {
+            delete req.session.auth;
+            return res.json({ emailError: true });
+          }
         }
       }
     }
   }
+
   //Returning variable if user is not logged in
   return res.json({ loggedIn: false });
 });
 
-app.delete("/api/user", async (req, res) => {});
+//Function for deleting account
+app.delete("/api/delete", async (req, res) => {
+  //Waiting for delete prompt from frontend
+  let { deleteAccount } = req.body;
+  if (deleteAccount) {
+    //Making sure user is logged in
+    if (req.session.userId) {
+      //Making sure code is verified
+      if (req.session.auth?.codeVerified) {
+        //Removing the user account along with settings, sessions, journal entries and projects
+        await db.collection("users").deleteOne({
+          _id: new ObjectId(req.session.userId),
+        });
+        await db.collection("settings").deleteMany({
+          userid: new ObjectId(req.session.userId),
+        });
+        await db.collection("pomodoroSessions").deleteMany({
+          userid: new ObjectId(req.session.userId),
+        });
+        await db.collection("journalEntries").deleteMany({
+          userid: new ObjectId(req.session.userId),
+        });
+        await db.collection("projects").deleteMany({
+          userid: new ObjectId(req.session.userId),
+        });
+
+        //Destroying all sessions when deletion is complete
+        return req.session.destroy((err) => {
+          //Returning an error message if session is not destroyed
+          if (err) {
+            return res.status(500).json({
+              error: "Logout failed",
+            });
+          }
+          //Returning a confirmation of account deletion to frontend
+          return res.json({ accountDeleted: true });
+        });
+      }
+    }
+  }
+  //Returning a confirmation that account was not deleted if anything goes wrong
+  return res.json({ accountDeleted: false });
+});
 
 app.post("/api/login", async (req, res) => {
   let { usernameInput, password, stayLoggedIn } = req.body;

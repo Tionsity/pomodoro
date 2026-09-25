@@ -279,9 +279,6 @@ function SmallSettingsCard({
       const data = await update({ deleteAccount: true }, "DELETE", "delete");
       if (data.accountDeleted) {
         setInputStep("accountDeleted");
-        setHideInput(true);
-        setButtonUpdate(true);
-        setpasswordText("Your account has been deleted");
       }
       if (data.accountDeleted === false) {
         setpasswordText("Something went wrong. Please try again later.");

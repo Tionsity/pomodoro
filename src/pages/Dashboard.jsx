@@ -36,7 +36,9 @@ export default function Dashboard() {
   if (loggedIn === true) {
     mainArea = (
       <div className="projectSelector">
-        <div className="projectCard">+</div>
+        <div className="projectCard newProject" onClick={() => alert("YA!")}>
+          +
+        </div>
         {projectList}
       </div>
     );

@@ -192,6 +192,10 @@ body {
   background-color: blue;
 }
 
+.newProject:hover {
+  cursor: pointer;
+}
+
 .projectButtons {
   display: flex;
   justify-content: space-between;
@@ -202,7 +206,7 @@ body {
 }
 
 .smallSettingsCard {
-  height: 100px;
+  height: auto;
   background-color: beige;
 }
 
@@ -214,6 +218,32 @@ body {
   background-color: rgb(129, 95, 214);
 }
 
+.testButton {
+  position: relative;
+  overflow: hidden;
+}
+
+@keyframes fillButton {
+  from {
+    width: 0%;
+  }
+
+  to {
+    width: 100%;
+  }
+}
+
+.testButton.playing::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0%;
+  background-color: rgba(44, 199, 44, 0.299);
+  animation: fillButton var(--animation-duration) linear;
+}
+
 .breakChoise {
   display: flex;
   justify-content: center;
@@ -223,4 +253,8 @@ input.breakBox {
   height: 15px;
   width: 15px;
   visibility: visible;
+}
+
+.accountDelete {
+  color: red;
 }
