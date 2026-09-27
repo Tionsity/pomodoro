@@ -1,11 +1,17 @@
 export async function update(updates, method, api) {
+  let bodySend;
+
+  if (method !== "GET") {
+    bodySend = JSON.stringify(updates);
+  }
+
   const response = await fetch(`http://localhost:3001/api/${api}`, {
     method: method,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(updates),
+    body: bodySend,
   });
 
   const data = await response.json();

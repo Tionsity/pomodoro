@@ -1,540 +1,66 @@
-import { useContext, useState, useEffect, useRef } from "react";
-import { AuthContext } from "../context/AuthContext";
-import playSound from "../helpers/playSound.js";
-import { stopSound } from "../helpers/playSound.js";
-import { progressBar } from "../helpers/progressbar.js";
+import { useState } from "react";
+import { colorPalette } from "../helpers/colorPalette.jsx";
 import { update } from "../helpers/update.js";
 
-function SmallSettingsCard({
-  openSetting,
-  chosenSound,
-  setchosenSound,
-  breakLong,
-  setBreakLong,
-  oldPassword,
-  setOldPassword,
-  newPassword,
-  deleteAccount,
-}) {
-  const startTestButtonText = "Test Sound";
-  const testButton = useRef(null);
-  const [testButtonText, setTestButtonText] = useState(startTestButtonText);
-  const [testButtonStarted, setTestButtonStarted] = useState(false);
+export function DashboardSettingsCard(project) {
+  let [changedName, setChangedName] = useState(project.name);
+  let [changedDescription, setChangedDescription] = useState(
+    project.description,
+  );
+  let [changedNumberofPomodoros, setChangedNumberofPomodoros] = useState(
+    project.numberOfPomodoros,
+  );
+  let [changedColor, setChangedColor] = useState(project.color);
 
-  if (openSetting === "sound") {
-    let testSounds = {
-      one: chosenSound + "Pm",
-      two: chosenSound + "Break",
-    };
+  let changedValues = {};
 
-    async function soundPlaying() {
-      if (testButtonStarted === true) {
-        stopSound();
-      }
-      setTestButtonStarted(true);
-      setTestButtonText("Sound of completed Pomodoro");
-      await playSound(testSounds.one, testButton.current);
-      setTestButtonText("Sound of completed Break");
-      await playSound(testSounds.two, testButton.current);
-      setTestButtonText(startTestButtonText);
-      setTestButtonStarted(false);
-    }
-
-    return (
-      <div className="smallSettingsCard">
-        <h4>Which set of sounds would you prefer?</h4>
-        <button
-          className={
-            chosenSound === "ding"
-              ? "underlineableButton selected"
-              : "underlineableButton"
-          }
-          onClick={() => setchosenSound("ding")}>
-          Ding
-        </button>
-        <button
-          className={
-            chosenSound === "piano"
-              ? "underlineableButton selected"
-              : "underlineableButton"
-          }
-          onClick={() => setchosenSound("piano")}>
-          Piano
-        </button>
-        <button
-          className={
-            chosenSound === "sam"
-              ? "underlineableButton selected"
-              : "underlineableButton"
-          }
-          onClick={() => setchosenSound("sam")}>
-          MS Sam
-        </button>
-        <button
-          className={
-            chosenSound === "kino"
-              ? "underlineableButton selected"
-              : "underlineableButton"
-          }
-          onClick={() => setchosenSound("kino")}>
-          Absolute Kino
-        </button>
-        <br />
-        <button
-          ref={testButton}
-          className="testButton"
-          onClick={() => soundPlaying()}>
-          {testButtonText}
-        </button>
-      </div>
-    );
-  }
-
-  if (openSetting === "break") {
-    return (
-      <div className="smallSettingsCard">
-        <h4>Include a long break or nah?</h4>
-        <p>(This option gives you a break of 15 minutes every 4 Pomodoros)</p>
-        <div className="breakChoise">
-          <p>Yes</p>
-          <input
-            className="breakBox"
-            type="checkbox"
-            checked={breakLong}
-            onChange={(event) => setBreakLong(event.target.checked)}
-          />
-          <p>No</p>
-        </div>
-      </div>
-    );
-  }
-
-  let passwordTextStartChoise = "";
-
-  if (openSetting === "delete") {
-    passwordTextStartChoise = "delete your account";
-  } else {
-    passwordTextStartChoise = `change your ${openSetting}`;
-  }
-  const passwordTextStart = `In order to ${passwordTextStartChoise}, you must first enter your current password`;
-  const [passwordText, setpasswordText] = useState(passwordTextStart);
-  const [inputStep, setInputStep] = useState("password");
-  const [passwordTextColor, setPasswordTextColor] = useState("black");
-  const [code, setCode] = useState("");
-  const [newValue, setNewValue] = useState("");
-
-  useEffect(() => {
-    const navigation = performance.getEntriesByType("navigation")[0];
-
-    async function reloadCheck() {
-      if (navigation.type === "reload") {
-        const data = await update({ cancelAuth: true }, "PATCH", "user");
-      }
-    }
-    reloadCheck();
-  }, []);
-
-  const values = {
-    password: oldPassword,
-    code: code,
-    newValue: newValue,
-  };
-
-  const setters = {
-    password: setOldPassword,
-    code: setCode,
-    newValue: setNewValue,
-  };
-
-  const inputTypes = {
-    password: "password",
-    code: "text",
-  };
-
-  let send = values.password;
-  if (inputStep === "code") {
-    send = values.code;
-  }
-  if (inputStep === "newValue") {
-    send = values.newValue;
-  }
-
-  let [hideInput, setHideInput] = useState(false);
-  let [buttonUpdate, setButtonUpdate] = useState(false);
-
-  async function message(correct, input) {
-    setPasswordTextColor("black");
-    if (input === "") {
-      setpasswordText(`Uhm, you wanna actually write your ${inputStep}, bud?`);
-    } else if (!correct) {
-      setpasswordText(`Wrong ${inputStep}!`);
-      setPasswordTextColor("red");
-    } else {
-      if (inputStep === "password") {
-        setpasswordText(
-          "Correct! Please check your email for a verification code and enter it.",
-        );
-      }
-      if (inputStep === "code") {
-        if (openSetting === "delete") {
-          setpasswordText("Are you sure you want to delete your account?");
-        } else {
-          setpasswordText(`Correct! Please choose your new ${openSetting}.`);
-        }
-      }
-      if (inputStep === "newValue" || inputStep === "accountDeleted") {
-        setHideInput(true);
-        setButtonUpdate(true);
-        if (inputStep === "newValue") {
-          if (newValue !== "") {
-            setpasswordText(`And ye ${openSetting} has been changed.`);
-          }
-          if (inputStep === "accountDeleted") {
-            setpasswordText("Your account has been deleted");
-          }
-        }
-      }
-    }
-  }
-
-  async function theUpdater(oldValueInput) {
-    let changedValue;
-    if (openSetting === "password") {
-      changedValue = "newPassword";
-    }
-    if (openSetting === "username") {
-      changedValue = "newUsername";
-    }
-    if (openSetting === "email") {
-      changedValue = "newEmail";
-    }
-
-    if (inputStep === "password") {
-      const data = await update({ oldPassword }, "PATCH", "user");
-
-      if (data.codeSent === true) {
-        setInputStep("code");
-      }
-      message(data.codeSent, send);
-    }
-    if (inputStep === "code") {
-      const data = await update(
-        {
-          oldPassword,
-          codeEntered: true,
-          emailCodeInput: code,
-        },
-        "PATCH",
-        "user",
-      );
-      if (data.expired) {
-        setInputStep("password");
-        setCode("");
-        setpasswordText("The code has expired. Please start again.");
-      }
-      if (data.incorrectCode) {
-        if (data.attempts >= data.maxAttempts) {
-          setInputStep("password");
-          setCode("");
-          setpasswordText(
-            "Too many attempts. Please start from the beginning by entering your current password.",
-          );
-        } else {
-          setpasswordText(
-            `Wrong code! Attempt (${data.attempts}/${data.maxAttempts})`,
-          );
-        }
-      } else {
-        message(data.codeVerified, send);
-        if (data.codeVerified === true) {
-          if (openSetting === "delete") {
-            setInputStep("delete");
-          } else {
-            setInputStep("newValue");
-          }
-        }
-      }
-    }
-    if (inputStep === "newValue") {
-      if (newValue === "") {
-        setpasswordText(`Ya gotta write somethin' in there, dude`);
-      } else {
-        const data = await update(
-          {
-            [changedValue]: newValue,
-          },
-          "PATCH",
-          "user",
-        );
-
-        if (data.currentValue) {
-          setpasswordText(`That's already your ${openSetting}`);
-        } else {
-          message(data.valueUpdated);
-        }
-      }
-    }
-    //GAGGA1
-    if (inputStep === "delete") {
-      const data = await update({ deleteAccount: true }, "DELETE", "delete");
-      if (data.accountDeleted) {
-        setInputStep("accountDeleted");
-      }
-      if (data.accountDeleted === false) {
-        setpasswordText("Something went wrong. Please try again later.");
-      }
-    }
-  }
-
-  let smallSettingsTitle = `Change your ${openSetting}`;
-  let submitButtonText = "Submit";
-
-  if (openSetting === "delete") {
-    smallSettingsTitle = "Delete your account";
-    if (inputStep === "delete") {
-      submitButtonText = "Yes";
-    }
-  }
+  let [deletestep, setDeleteStep] = useState("ask");
 
   return (
-    <div className="smallSettingsCard">
-      <h4> {smallSettingsTitle} </h4>
-      <p className="passwordText" style={{ color: passwordTextColor }}>
-        {passwordText}
-      </p>
-      {inputStep !== "delete" &&
-        inputStep !== "accountDeleted" &&
-        !hideInput && (
-          <input
-            className="passwordCheckInput"
-            type={inputTypes[inputStep]}
-            placeholder={inputTypes[inputStep]}
-            value={values[inputStep]}
-            onChange={(event) => setters[inputStep](event.target.value)}
-          />
-        )}
-      {buttonUpdate !== true && (
+    <div className="dashboardSettingsCard">
+      <form action="">
+        <label htmlFor="">Title</label>
+        <input
+          type="text"
+          value={changedName}
+          onChange={(event) => setChangedName(event.target.value)}
+        />
+        <label htmlFor="">Description</label>
+        <input
+          type="text"
+          value={changedDescription}
+          onChange={(event) => setChangedDescription(event.target.value)}
+        />
+        <br />
+        <label htmlFor="">Color</label>
+        {colorPalette(setChangedColor)}
+        <br />
+        <label htmlFor="">Number of Pomodoros</label>
+        <input
+          type="number"
+          value={changedNumberofPomodoros}
+          onChange={(event) => setChangedNumberofPomodoros(event.target.value)}
+        />
         <button
-          onClick={async (event) => {
-            theUpdater(values[inputStep]);
+          type="button"
+          onClick={async () => {
+            changedValues = {
+              newTitle: changedName,
+              newDescription: changedDescription,
+              newColor: changedColor,
+              NewNumberOfPomodoros: changedNumberofPomodoros,
+              currentProject: project,
+            };
+            await update(changedValues, "PATCH", "projects");
+            location.reload();
           }}>
-          {submitButtonText}
+          Submit
         </button>
-      )}
-      {buttonUpdate && <button onClick={() => location.reload()}>Ok!</button>}
+        <br />
+        <button className="projectDelete" onClick={async () => {}}>
+          Delete Project
+        </button>
+      </form>
     </div>
   );
-
-  return null;
 }
-
-function SettingsCard() {
-  const [chosenSound, setchosenSound] = useState("");
-  const [breakLong, setBreakLong] = useState(false);
-  const [oldPassword, setOldPassword] = useState("");
-
-  async function submitSettings(event) {
-    event.preventDefault();
-    const response = await fetch("http://localhost:3001/api/settings", {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chosenSound,
-        breakLong,
-      }),
-    });
-  }
-  const [settings, setSettings] = useState(null);
-
-  async function userSettings() {
-    const response = await fetch("http://localhost:3001/api/settings", {
-      credentials: "include",
-    });
-    const data = await response.json();
-
-    setSettings(data);
-  }
-
-  useEffect(() => {
-    userSettings();
-  }, []);
-
-  useEffect(() => {
-    if (settings) {
-      setchosenSound(settings.chosenSound);
-      setBreakLong(settings.breakLong);
-    }
-  }, [settings]);
-
-  const { handleLogout } = useContext(AuthContext);
-
-  const [accountSettingsOpen, setaccountSettingsOpen] = useState(false);
-  const [pomodoroSettingsOpen, setpomodoroSettingsOpen] = useState(false);
-
-  const [openSetting, setOpenSetting] = useState(null);
-
-  let settingsCard;
-
-  function clickChecker(setting) {
-    function inputReset() {
-      setOldPassword("");
-    }
-    if (openSetting === setting) {
-      setOpenSetting(null);
-      inputReset();
-      async function reset() {
-        const data = await update({ cancelAuth: true }, "PATCH", "user");
-      }
-      reset();
-    } else {
-      setOpenSetting(setting);
-      inputReset();
-    }
-  }
-
-  const accountSettingsProps = {
-    openSetting: openSetting,
-    oldPassword: oldPassword,
-    setOldPassword: setOldPassword,
-  };
-
-  if (accountSettingsOpen === true) {
-    settingsCard = (
-      <>
-        <h2>Dis be da account settings</h2>
-        <br />
-        <button
-          onClick={() => {
-            clickChecker("username");
-          }}>
-          Change username
-        </button>
-        {openSetting === "username" && (
-          <SmallSettingsCard {...accountSettingsProps} />
-        )}
-        <br />
-        <button
-          onClick={() => {
-            clickChecker("email");
-          }}>
-          Change email
-        </button>
-        {openSetting === "email" && (
-          <SmallSettingsCard {...accountSettingsProps} />
-        )}
-        <br />
-        <button
-          onClick={() => {
-            clickChecker("password");
-          }}>
-          Change password
-        </button>
-        {openSetting === "password" && (
-          <SmallSettingsCard {...accountSettingsProps} />
-        )}
-        <br />
-        <br />
-        <br />
-        <br />
-        <button
-          className="accountDelete"
-          onClick={() => {
-            clickChecker("delete");
-          }}>
-          Delete account
-        </button>
-        {openSetting === "delete" && (
-          <SmallSettingsCard {...accountSettingsProps} />
-        )}
-        <br />
-        <button
-          onClick={(event) => {
-            setaccountSettingsOpen(false);
-            submitSettings(event);
-            setOpenSetting(null);
-          }}>
-          Save changes
-        </button>
-        <button
-          onClick={() => {
-            setOpenSetting(null);
-            setaccountSettingsOpen(false);
-          }}>
-          Discard changes
-        </button>
-      </>
-    );
-  } else if (pomodoroSettingsOpen === true) {
-    settingsCard = (
-      <>
-        <h2>Dis be da pomodoro settings</h2>
-        <br />
-        <button onClick={() => setOpenSetting("sound")}>Which sound </button>
-        {openSetting === "sound" && (
-          <SmallSettingsCard
-            openSetting={openSetting}
-            chosenSound={chosenSound}
-            setchosenSound={setchosenSound}
-          />
-        )}
-        <br />
-        <button onClick={() => setOpenSetting("break")}>Break settings</button>
-        {openSetting === "break" && (
-          <SmallSettingsCard
-            openSetting={openSetting}
-            breakLong={breakLong}
-            setBreakLong={setBreakLong}
-          />
-        )}
-        <br />
-        <br />
-        <button
-          onClick={(event) => {
-            submitSettings(event);
-            setOpenSetting(null);
-            setpomodoroSettingsOpen(false);
-          }}>
-          Save changes
-        </button>
-        <button
-          onClick={() => {
-            setOpenSetting(null);
-            setchosenSound(settings.chosenSound);
-            setBreakLong(settings.breakLong);
-            setpomodoroSettingsOpen(false);
-          }}>
-          Discard changes
-        </button>
-      </>
-    );
-  } else {
-    settingsCard = (
-      <>
-        <h2>Dis be da settings </h2>
-        <br />
-        <form>
-          <button onClick={(event) => setaccountSettingsOpen(true)}>
-            Account settings
-          </button>
-          <br />
-          <button onClick={(event) => setpomodoroSettingsOpen(true)}>
-            Pomodoro settings
-          </button>
-          <br />
-          <br />
-          <br />
-          <button onClick={handleLogout}>
-            <strong>Log out</strong>
-          </button>
-        </form>
-      </>
-    );
-  }
-
-  return <div className="card">{settingsCard}</div>;
-}
-
-export default SettingsCard;

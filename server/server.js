@@ -374,8 +374,6 @@ app.post("/api/login", async (req, res) => {
 
   usernameInput = usernameInput.toLowerCase();
 
-  console.log("Searching for username:", JSON.stringify(usernameInput));
-
   const user = await db.collection("users").findOne({
     username: {
       $regex: `^${usernameInput}$`,
@@ -435,6 +433,79 @@ app.get("/api/projects", async (req, res) => {
       .toArray();
     return res.json(projects);
   }
+});
+
+app.post("/api/projects", async (req, res) => {
+  let { chosenTitle, chosenDescription, chosenColor, chosenNumberOfPomodoros } =
+    req.body;
+  if (req.session.userId) {
+    const existingProjects = await db
+      .collection("projects")
+      .find({ userid: new ObjectId(req.session.userId) })
+      .toArray();
+    let number = existingProjects.length + 1;
+
+    await db.collection("projects").insertOne({
+      _id: new ObjectId(),
+      name: chosenTitle,
+      userid: new ObjectId(req.session.userId),
+      description: chosenDescription,
+      color: chosenColor,
+      numberOfPomodoros: chosenNumberOfPomodoros,
+      number,
+      completedPomodoros: 0,
+    });
+    return res.json({ projectedAdded: true });
+  }
+  return res.json({ projectedAdded: false });
+});
+
+app.patch("/api/projects", async (req, res) => {
+  let {
+    newTitle,
+    newDescription,
+    newColor,
+    NewNumberOfPomodoros,
+    currentProject,
+  } = req.body;
+  if (req.session.userId) {
+    const existingProjects = await db.collection("projects").findOne({
+      _id: new ObjectId(currentProject._id),
+      userid: new ObjectId(req.session.userId),
+    });
+    if (NewNumberOfPomodoros < existingProjects.completedPomodoros) {
+      return res.json({ tooLow: true });
+    } else {
+      await db.collection("projects").updateOne(
+        {
+          _id: new ObjectId(currentProject._id),
+          userid: new ObjectId(req.session.userId),
+        },
+        {
+          $set: {
+            name: newTitle,
+            description: newDescription,
+            color: newColor,
+            numberOfPomodoros: Number(NewNumberOfPomodoros),
+          },
+        },
+      );
+      return res.json({ projectUpdated: true });
+    }
+  }
+  return res.json({ projectUpdated: false });
+});
+
+app.delete("/api/projects", async (req, res) => {
+  let { currentProject } = req.body;
+  if (req.session.userId) {
+    await db.collection("projects").deleteOne({
+      _id: new ObjectId(currentProject._id),
+      userid: new ObjectId(req.session.userId),
+    });
+    return res.json({ projectDeleted: true });
+  }
+  return res.json({ projectDeleted: false });
 });
 
 app.post("/api/logout", (req, res) => {

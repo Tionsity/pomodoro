@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-export function Journal() {
+export default function Journal() {
   return (
     <>
       <h1>Write ye thangs!</h1>

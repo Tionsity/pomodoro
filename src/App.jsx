@@ -9,7 +9,8 @@ import Register from "./components/register.jsx";
 import Login from "./components/login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import { Project } from "./pages/Project.jsx";
-import { Journal } from "./pages/Journal.jsx";
+import Journal from "./pages/Journal.jsx";
+import { NewProject } from "./pages/newProjext.jsx";
 import { TopBar } from "./components/topbar.jsx";
 import { Layout } from "./components/layout.jsx";
 function App() {
@@ -42,6 +43,14 @@ function App() {
           element={
             <>
               <Journal></Journal>
+            </>
+          }
+        />
+        <Route
+          path="/newProject"
+          element={
+            <>
+              <NewProject></NewProject>
             </>
           }
         />
