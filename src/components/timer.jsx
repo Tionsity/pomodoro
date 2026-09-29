@@ -1,13 +1,40 @@
 import { useState, useEffect } from "react";
+import { Link, useParams } from "react-router-dom";
 import ding from "../assets/sounds/ding/ding_pm_end.mp3";
 import timer from "../assets/sounds/timer.mp3";
+import { update } from "../helpers/update.js";
+import playSound from "../helpers/playSound.js";
+import stopSound from "../helpers/playSound.js";
+
+const data = await update(null, "GET", "projects");
+const settingsData = await update(null, "GET", "settings");
+
+let chosenSound = settingsData.chosenSound;
+
+let breakCounter = 0;
+
+let soundToPlay = {
+  one: chosenSound + "Pm",
+  two: chosenSound + "Break",
+};
+
+console.log(settingsData);
 
 export default function Timer() {
+  const { name, id } = useParams();
+  const currentProject = data.find((project) => project._id === id);
+
+  async function makeUpdate(updateParam) {
+    await update(updateParam, "PATCH", "projects");
+  }
+
   const startText = "Start Pomodoro";
   const startStatusText = "Ready for Pomodoro!";
   const startProgressBar = "";
 
-  let [pomodoroNumber, setPomodoroNumber] = useState(0);
+  let [pomodoroNumber, setPomodoroNumber] = useState(
+    currentProject.completedPomodoros,
+  );
   let [statusText, setStatusText] = useState(startStatusText);
   let [text, setText] = useState(startText);
   const [mode, setMode] = useState("idle");
@@ -20,8 +47,15 @@ export default function Timer() {
   const [breakStart, setBreakStart] = useState(null);
   const [breakStop, setBreakStop] = useState(null);
 
+  const [longBreak, setLongBreak] = useState(false);
+
   const workTime = 1500000;
   const breakTime = 300000;
+  const breakTimeLong = 900000;
+
+  // const workTime = 3000;
+  // const breakTime = 3000;
+  // const breakTimeLong = 3000;
 
   const progressBars = 10;
   const progressTick = workTime / progressBars;
@@ -54,8 +88,13 @@ export default function Timer() {
         let emptyBoxes = Math.floor(progressBars - fullBoxes);
         setProgressbar("■".repeat(fullBoxes) + "□".repeat(emptyBoxes));
         if (Date.now() >= stop) {
-          setPomodoroNumber((prev) => prev + 1);
-          sound.play();
+          makeUpdate({
+            currentProject: currentProject,
+            newCurrentNumberOfPomodoros: currentProject.completedPomodoros + 1,
+          });
+          stopSound();
+          playSound(soundToPlay.one, null);
+          setPomodoroNumber(pomodoroNumber + 1);
           setMode("break");
         }
       }, 500);
@@ -67,17 +106,42 @@ export default function Timer() {
     if (mode === "break") {
       sound.volume = 0.5;
       const start = Date.now();
-      const stop = start + breakTime;
+
+      let stop;
+
+      if (longBreak) {
+        stop = start + breakTimeLong;
+      } else {
+        stop = start + breakTime;
+      }
 
       setStatusText("Break!");
       setProgressbar(startProgressBar);
 
       setBreakStart(start);
-      setBreakStop(start + breakTime);
+      if (!longBreak) {
+        setBreakStop(start + breakTime);
+      } else {
+        setBreakStop(start + longBreak);
+        setStatusText("Time for a long break!");
+      }
 
       const interval = setInterval(() => {
         if (Date.now() >= stop) {
-          sound.play();
+          if (settingsData.breakLong) {
+            if (breakCounter > 2) {
+              setLongBreak(false);
+              breakCounter = 0;
+            } else if (breakCounter === 2) {
+              setLongBreak(true);
+              breakCounter++;
+            } else {
+              breakCounter++;
+            }
+          }
+          stopSound();
+          console.log(breakCounter);
+          playSound(soundToPlay.two, null);
           setMode("work");
         }
       }, 500);
@@ -99,7 +163,10 @@ export default function Timer() {
   return (
     <div>
       <p>{statusText}</p>
-      <p>Number of Pomodoros: {pomodoroNumber}</p>
+      <p>
+        Completed Pomodoros: {pomodoroNumber} /{" "}
+        {currentProject.numberOfPomodoros}
+      </p>
       <button onClick={klickad}>{text}</button>
       <p>{progressbar}</p>
     </div>

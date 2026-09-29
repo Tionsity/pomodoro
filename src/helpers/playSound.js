@@ -35,7 +35,9 @@ async function playSound(soundFile, button) {
   return new Promise((resolve) => {
     currentSound.addEventListener("ended", function () {
       currentSound.currentTime = 0;
-      button.classList.remove("playing");
+      if (button !== null) {
+        button.classList.remove("playing");
+      }
       resolve();
     });
   });

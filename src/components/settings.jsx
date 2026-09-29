@@ -151,6 +151,8 @@ function SmallSettingsCard({
     code: "text",
   };
 
+  const placeholders = { password: "Password", code: "Code" };
+
   let send = values.password;
   if (inputStep === "code") {
     send = values.code;
@@ -162,7 +164,38 @@ function SmallSettingsCard({
   let [hideInput, setHideInput] = useState(false);
   let [buttonUpdate, setButtonUpdate] = useState(false);
 
-  async function message(correct, input) {
+  const [timerMessage, setTimerMessage] = useState(false);
+  const [checkExpiery, setCheckExpiery] = useState(false);
+
+  const [expiredCodeTime, setExpiredCodeTime] = useState(10);
+  useEffect(() => {
+    console.log("expiredCodeTime CHANGED:", expiredCodeTime);
+  }, [expiredCodeTime]);
+  async function message(correct, input, data) {
+    const userData = await update(null, "GET", "me");
+    const userEmail = userData.email;
+    let userEmailDotNumber = userEmail.indexOf(".");
+    let userEmailLastCharactersNumber =
+      userEmail.length - userEmailDotNumber - 1;
+    let userEmailMasked =
+      userEmail[0] +
+      "*".repeat(5) +
+      "@" +
+      "*".repeat(5) +
+      "." +
+      userEmail.slice(-userEmailLastCharactersNumber);
+    console.log("expiresAt:", data.expiresAt);
+
+    console.log("now:", Date.now());
+    setExpiredCodeTime(
+      Math.floor((data.expiresAt - Date.now()) / 1000 / 60) + 1,
+    );
+    const timeleft = setInterval(() => {
+      console.log("TICK");
+      setExpiredCodeTime((time) => time - 1);
+    }, 60000);
+    const timeLeft = Math.floor((data.expiresAt - Date.now()) / 1000 / 60) + 1;
+    setExpiredCodeTime(timeLeft);
     setPasswordTextColor("black");
     if (input === "") {
       setpasswordText(`Uhm, you wanna actually write your ${inputStep}, bud?`);
@@ -170,12 +203,13 @@ function SmallSettingsCard({
       setpasswordText(`Wrong ${inputStep}!`);
       setPasswordTextColor("red");
     } else {
-      if (inputStep === "password") {
-        setpasswordText(
-          "Correct! Please check your email for a verification code and enter it.",
-        );
-      }
+      setTimerMessage(true);
+      setpasswordText(
+        `Correct! Please check your email (${userEmailMasked}) for a verification code and enter it.`,
+      );
+      submitButtonText = "Start again";
       if (inputStep === "code") {
+        setTimerMessage(false);
         if (openSetting === "delete") {
           setpasswordText("Are you sure you want to delete your account?");
         } else {
@@ -197,6 +231,18 @@ function SmallSettingsCard({
     }
   }
 
+  let [codeExpiredIndicator, setCodeExpiredIndicator] = useState(false);
+
+  useEffect(() => {
+    if (codeExpiredIndicator) {
+      setInputStep("password");
+      setOldPassword("");
+      setpasswordText(
+        "Your code has expired. Please start over by entering your password.",
+      );
+    }
+  }, [codeExpiredIndicator]);
+
   async function theUpdater(oldValueInput) {
     let changedValue;
     if (openSetting === "password") {
@@ -210,12 +256,20 @@ function SmallSettingsCard({
     }
 
     if (inputStep === "password") {
+      setCodeExpiredIndicator(false);
       const data = await update({ oldPassword }, "PATCH", "user");
 
       if (data.codeSent === true) {
+        setCodeExpiredIndicator(false);
         setInputStep("code");
+        setTimeout(() => {
+          setCheckExpiery(true);
+        }, 600000);
+        if (checkExpiery && !data.codeVerified) {
+          setCodeExpiredIndicator(true);
+        }
       }
-      message(data.codeSent, send);
+      message(data.codeSent, send, data);
     }
     if (inputStep === "code") {
       const data = await update(
@@ -245,7 +299,7 @@ function SmallSettingsCard({
           );
         }
       } else {
-        message(data.codeVerified, send);
+        message(data.codeVerified, send, data);
         if (data.codeVerified === true) {
           if (openSetting === "delete") {
             setInputStep("delete");
@@ -270,11 +324,14 @@ function SmallSettingsCard({
         if (data.currentValue) {
           setpasswordText(`That's already your ${openSetting}`);
         } else {
-          message(data.valueUpdated);
+          setpasswordText(`And ye ${openSetting} has been changed.`);
+          document.getElementsByClassName(
+            "passwordCheckInput",
+          )[0].style.visibility = "hidden";
+          setButtonUpdate(true);
         }
       }
     }
-    //GAGGA1
     if (inputStep === "delete") {
       const data = await update({ deleteAccount: true }, "DELETE", "delete");
       if (data.accountDeleted) {
@@ -304,6 +361,20 @@ function SmallSettingsCard({
       <h4> {smallSettingsTitle} </h4>
       <p className="passwordText" style={{ color: passwordTextColor }}>
         {passwordText}
+        {inputStep === "code" &&
+          timerMessage &&
+          !codeExpiredIndicator &&
+          `
+        The code expires in ${expiredCodeTime} minute`}
+        {inputStep === "code" &&
+          timerMessage &&
+          expiredCodeTime > 1 &&
+          !codeExpiredIndicator &&
+          `s`}
+        {inputStep === "code" &&
+          expiredCodeTime > 0 &&
+          !codeExpiredIndicator &&
+          "."}
       </p>
       {inputStep !== "delete" &&
         inputStep !== "accountDeleted" &&
@@ -311,7 +382,7 @@ function SmallSettingsCard({
           <input
             className="passwordCheckInput"
             type={inputTypes[inputStep]}
-            placeholder={inputTypes[inputStep]}
+            placeholder={placeholders[inputStep]}
             value={values[inputStep]}
             onChange={(event) => setters[inputStep](event.target.value)}
           />
@@ -453,21 +524,26 @@ function SettingsCard() {
           <SmallSettingsCard {...accountSettingsProps} />
         )}
         <br />
-        <button
-          onClick={(event) => {
-            setaccountSettingsOpen(false);
-            submitSettings(event);
-            setOpenSetting(null);
-          }}>
-          Save changes
-        </button>
-        <button
-          onClick={() => {
-            setOpenSetting(null);
-            setaccountSettingsOpen(false);
-          }}>
-          Discard changes
-        </button>
+        {openSetting === "sound" ||
+          (openSetting === "break" && (
+            <>
+              <button
+                onClick={(event) => {
+                  setaccountSettingsOpen(false);
+                  submitSettings(event);
+                  setOpenSetting(null);
+                }}>
+                Save changes
+              </button>
+              <button
+                onClick={() => {
+                  setOpenSetting(null);
+                  setaccountSettingsOpen(false);
+                }}>
+                Discard changes
+              </button>
+            </>
+          ))}
       </>
     );
   } else if (pomodoroSettingsOpen === true) {

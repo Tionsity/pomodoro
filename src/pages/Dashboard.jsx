@@ -25,18 +25,38 @@ export default function Dashboard() {
   let showProjectStart = {};
   let [showProject, setShowProject] = useState(showProjectStart);
 
+  console.log(loggedIn);
+
   let currentProjectChange;
 
   const projectList = projects.map((project) => {
+    let textColor = "black";
+
+    if (
+      project.color === "black" ||
+      project.color === "blue" ||
+      project.color === "purple" ||
+      project.color === "gray" ||
+      project.color === "green"
+    ) {
+      textColor = "white";
+    }
     return (
       <div
         className="projectCard"
         id={project._id}
         key={project._id}
-        style={{ backgroundColor: project.color }}>
-        <p>{project.name}</p>
+        style={{ backgroundColor: project.color, color: textColor }}>
+        <Link
+          style={{ color: textColor }}
+          to={`/project/${project._id}/${project.name.replaceAll(" ", "_")}`}>
+          {project.name}
+        </Link>
         <div className="projectButtons">
-          <Link className="journalLink" to="/journal">
+          <Link
+            className="journalLink"
+            to="/journal"
+            style={{ color: textColor }}>
             ✎
           </Link>
           <button

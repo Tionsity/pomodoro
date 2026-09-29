@@ -35,14 +35,14 @@ function checkValidity(username, email) {
 }
 
 function emailCode() {
-  // return randomInt(100000, 1000000);
-  return 123456;
+  return randomInt(100000, 1000000);
+  // return 123456;
 }
 
 async function sendEmail(email, code) {
   const { data, error } = await resend.emails.send({
     from: "Pomodoro <contact@tionsity.dev>",
-    to: "naifddqn@sharklasers.com",
+    to: email,
     subject: "Ye Olde Code",
     html: `<p>Your verification code is <strong>${code}</strong></p>`,
   });
@@ -90,7 +90,7 @@ async function checkUser(user, value) {
 }
 
 app.post("/api/check-user", async (req, res) => {
-  let { usernameInput, emailInput, password } = req.body;
+  let { usernameInput, emailInput, password, codeInput, inputStep } = req.body;
 
   usernameInput = usernameInput.toLowerCase();
   emailInput = emailInput.toLowerCase();
@@ -132,24 +132,38 @@ app.post("/api/check-user", async (req, res) => {
   }
 
   if (!usernameExists && !emailExists) {
-    const passwordHash = await argon2.hash(password);
-    await db.collection("users").insertOne({
-      username: usernameInput,
-      email: emailInput.toLowerCase(),
-      passwordHash,
-      createdAt: new Date(),
-      verified: false,
-    });
+    if (!req.session.registration) {
+      req.session.registration = {
+        code: emailCode(),
+      };
+      sendEmail(emailInput, req.session.registration.code);
+      return res.json({ codeSent: true });
+    }
+    if (req.session.registration.code === Number(codeInput)) {
+      const passwordHash = await argon2.hash(password);
+      await db.collection("users").insertOne({
+        username: usernameInput,
+        email: emailInput.toLowerCase(),
+        passwordHash,
+        createdAt: new Date(),
+        verified: false,
+      });
+      delete req.session.registration;
+      return res.json({ accountCreated: true });
+    } else {
+      delete req.session.registration;
+      return res.json({ wrongCode: true });
+    }
   }
 
-  res.json({
+  return res.json({
     usernameExists: Boolean(usernameExists),
     emailExists: Boolean(emailExists),
-    validUsername: Boolean(validUsername),
-    accountCreated: !usernameExists && !emailExists,
+    validUsername: true,
+    validEmail: true,
+    accountCreated: false,
   });
 });
-
 //Function to update username, email and password for user
 app.patch("/api/user", async (req, res) => {
   let {
@@ -284,7 +298,9 @@ app.patch("/api/user", async (req, res) => {
                     codeVerified: true,
                     expiresAt: Date.now() + 1000 * 60 * 10,
                   };
-                  return res.json({ codeVerified: true });
+                  return res.json({
+                    codeVerified: true,
+                  });
                 }
               }
             }
@@ -311,7 +327,10 @@ app.patch("/api/user", async (req, res) => {
           );
 
           if (!emailResult.errorHappened) {
-            return res.json({ codeSent: true });
+            return res.json({
+              codeSent: true,
+              expiresAt: req.session.auth.expiresAt,
+            });
           } else {
             delete req.session.auth;
             return res.json({ emailError: true });
@@ -417,6 +436,7 @@ app.get("/api/me", async (req, res) => {
     return res.json({
       loggedIn: true,
       user: user.username,
+      email: user.email,
     });
   }
 
@@ -433,6 +453,7 @@ app.get("/api/projects", async (req, res) => {
       .toArray();
     return res.json(projects);
   }
+  return res.json([]);
 });
 
 app.post("/api/projects", async (req, res) => {
@@ -466,32 +487,42 @@ app.patch("/api/projects", async (req, res) => {
     newDescription,
     newColor,
     NewNumberOfPomodoros,
+    newCurrentNumberOfPomodoros,
     currentProject,
   } = req.body;
+  let updateNames = {
+    newTitle: "name",
+    newDescription: "description",
+    newColor: "color",
+    NewNumberOfPomodoros: "numberOfPomodoros",
+    newCurrentNumberOfPomodoros: "completedPomodoros",
+  };
+  let projectUpdates = {};
+  for (const key in updateNames) {
+    if (req.body[key] !== undefined) {
+      projectUpdates[updateNames[key]] = req.body[key];
+    }
+  }
   if (req.session.userId) {
     const existingProjects = await db.collection("projects").findOne({
       _id: new ObjectId(currentProject._id),
       userid: new ObjectId(req.session.userId),
     });
-    if (NewNumberOfPomodoros < existingProjects.completedPomodoros) {
-      return res.json({ tooLow: true });
-    } else {
-      await db.collection("projects").updateOne(
-        {
-          _id: new ObjectId(currentProject._id),
-          userid: new ObjectId(req.session.userId),
-        },
-        {
-          $set: {
-            name: newTitle,
-            description: newDescription,
-            color: newColor,
-            numberOfPomodoros: Number(NewNumberOfPomodoros),
-          },
-        },
-      );
-      return res.json({ projectUpdated: true });
+    if (NewNumberOfPomodoros !== undefined) {
+      if (NewNumberOfPomodoros < existingProjects.completedPomodoros) {
+        return res.json({ tooLow: true });
+      }
     }
+    await db.collection("projects").updateOne(
+      {
+        _id: new ObjectId(currentProject._id),
+        userid: new ObjectId(req.session.userId),
+      },
+      {
+        $set: projectUpdates,
+      },
+    );
+    return res.json({ projectUpdated: true });
   }
   return res.json({ projectUpdated: false });
 });
@@ -529,6 +560,7 @@ app.get("/api/settings", async (req, res) => {
       .findOne({ userid: new ObjectId(req.session.userId) });
     return res.json(settings);
   }
+  return res.json([]);
 });
 
 app.post("/api/settings", async (req, res) => {
