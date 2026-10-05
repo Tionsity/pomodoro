@@ -43,6 +43,7 @@ export function useRegister(emailInput, usernameInput, password, codeInput) {
     if (inputStep === "code") {
       if (data.wrongCode) {
         alert("Wrong code!");
+        location.reload();
       }
       if (data.accountCreated) {
         alert("Your account was created");

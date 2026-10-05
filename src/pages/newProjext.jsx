@@ -26,6 +26,8 @@ export function NewProject() {
   let [chosenNumberOfPomodoros, setchosenNumberOfPomodoros] = useState(
     chosenNumberOfPomodorosStart,
   );
+  let [chosenMilestone, setChosenMilestone] = useState(null);
+  let [noMilestone, setNoMilestone] = useState(null);
 
   let card = (
     <div className="newProjectCard">
@@ -45,6 +47,7 @@ export function NewProject() {
           <p className="showNumberofPomodoros">
             Number of Pomodoros: {chosenNumberOfPomodoros}
           </p>
+          <p className="showChosenMilestone">Milestone: {chosenMilestone}</p>
           <br />
         </div>
       )}
@@ -57,7 +60,8 @@ export function NewProject() {
             userInput === "" &&
             inputStep !== "description" &&
             inputStep !== "review" &&
-            inputStep !== "color"
+            inputStep !== "color" &&
+            inputStep !== "milestone"
           ) {
             SetTitle("Ya gotta choose somethin' dude!");
           } else {
@@ -74,13 +78,12 @@ export function NewProject() {
                 setChosenDescription("Yeah, I didn't choose no descrip'");
               } else {
                 setChosenDescription(userInput);
-
-                document.getElementsByClassName(
-                  "newProjectInput",
-                )[0].style.visibility = "hidden";
-                setInputStep("color");
-                SetTitle("What color do you want for your project?");
               }
+              document.getElementsByClassName(
+                "newProjectInput",
+              )[0].style.visibility = "hidden";
+              setInputStep("color");
+              SetTitle("What color do you want for your project?");
             }
             if (inputStep === "color") {
               document.getElementsByClassName(
@@ -93,7 +96,22 @@ export function NewProject() {
               )[0].style.visibility = "visible";
             }
             if (inputStep === "numberOfPomodoros") {
+              document.getElementsByClassName(
+                "newProjectInput",
+              )[0].placeholder = "Milestone";
               setchosenNumberOfPomodoros(userInput);
+              setInputStep("milestone");
+              SetTitle(
+                "Would you like to add a first milestone to your project?",
+              );
+            }
+            if (inputStep === "milestone") {
+              if (userInput !== "") {
+                setChosenMilestone(userInput);
+              } else {
+                setChosenMilestone("No milestone added");
+                setNoMilestone(true);
+              }
               document.getElementsByClassName(
                 "newProjectInput",
               )[0].style.visibility = "hidden";
@@ -108,6 +126,8 @@ export function NewProject() {
                   chosenDescription,
                   chosenColor,
                   chosenNumberOfPomodoros,
+                  chosenMilestone,
+                  noMilestone,
                 },
                 "POST",
                 "projects",

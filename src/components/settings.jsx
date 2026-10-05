@@ -184,14 +184,11 @@ function SmallSettingsCard({
       "*".repeat(5) +
       "." +
       userEmail.slice(-userEmailLastCharactersNumber);
-    console.log("expiresAt:", data.expiresAt);
 
-    console.log("now:", Date.now());
     setExpiredCodeTime(
       Math.floor((data.expiresAt - Date.now()) / 1000 / 60) + 1,
     );
     const timeleft = setInterval(() => {
-      console.log("TICK");
       setExpiredCodeTime((time) => time - 1);
     }, 60000);
     const timeLeft = Math.floor((data.expiresAt - Date.now()) / 1000 / 60) + 1;

@@ -1,26 +1,35 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { Link, useParams } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
 import ding from "../assets/sounds/ding/ding_pm_end.mp3";
 import timer from "../assets/sounds/timer.mp3";
 import { update } from "../helpers/update.js";
 import playSound from "../helpers/playSound.js";
 import stopSound from "../helpers/playSound.js";
+import Dashboard from "../pages/Dashboard.jsx";
 
 const data = await update(null, "GET", "projects");
-const settingsData = await update(null, "GET", "settings");
-
-let chosenSound = settingsData.chosenSound;
+// const settingsData = await update(null, "GET", "settings");
 
 let breakCounter = 0;
 
-let soundToPlay = {
-  one: chosenSound + "Pm",
-  two: chosenSound + "Break",
-};
-
-console.log(settingsData);
+let chosenSound;
 
 export default function Timer() {
+  const [settingsData, setSettingsData] = useState(null);
+  async function reloadSettings() {
+    setSettingsData(await update(null, "GET", "settings"));
+  }
+  const { loggedIn } = useContext(AuthContext);
+  if (loggedIn && settingsData) {
+    chosenSound = settingsData.chosenSound;
+  } else {
+    chosenSound = "ding";
+  }
+  let soundToPlay = {
+    one: chosenSound + "Pm",
+    two: chosenSound + "Break",
+  };
   const { name, id } = useParams();
   const currentProject = data.find((project) => project._id === id);
 
@@ -49,13 +58,13 @@ export default function Timer() {
 
   const [longBreak, setLongBreak] = useState(false);
 
-  const workTime = 1500000;
-  const breakTime = 300000;
-  const breakTimeLong = 900000;
+  // const workTime = 1500000;
+  // const breakTime = 300000;
+  // const breakTimeLong = 900000;
 
-  // const workTime = 3000;
-  // const breakTime = 3000;
-  // const breakTimeLong = 3000;
+  const workTime = 3000;
+  const breakTime = 3000;
+  const breakTimeLong = 3000;
 
   const progressBars = 10;
   const progressTick = workTime / progressBars;
@@ -167,7 +176,13 @@ export default function Timer() {
         Completed Pomodoros: {pomodoroNumber} /{" "}
         {currentProject.numberOfPomodoros}
       </p>
-      <button onClick={klickad}>{text}</button>
+      <button
+        onClick={async () => {
+          await reloadSettings();
+          klickad();
+        }}>
+        {text}
+      </button>
       <p>{progressbar}</p>
     </div>
   );

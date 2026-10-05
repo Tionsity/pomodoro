@@ -141,12 +141,17 @@ app.post("/api/check-user", async (req, res) => {
     }
     if (req.session.registration.code === Number(codeInput)) {
       const passwordHash = await argon2.hash(password);
-      await db.collection("users").insertOne({
+      const result = await db.collection("users").insertOne({
         username: usernameInput,
         email: emailInput.toLowerCase(),
         passwordHash,
         createdAt: new Date(),
         verified: false,
+      });
+      await db.collection("settings").insertOne({
+        userid: result.insertedId,
+        breakLong: false,
+        chosenSound: "ding",
       });
       delete req.session.registration;
       return res.json({ accountCreated: true });
@@ -456,9 +461,26 @@ app.get("/api/projects", async (req, res) => {
   return res.json([]);
 });
 
+app.get("/api/milestones/:id", async (req, res) => {
+  let { id } = req.params;
+  if (req.session.userId) {
+    const milestone = await db
+      .collection("milestones")
+      .findOne({ projectid: new ObjectId(id), reached: false });
+    return res.json(milestone);
+  }
+  return res.json();
+});
+
 app.post("/api/projects", async (req, res) => {
-  let { chosenTitle, chosenDescription, chosenColor, chosenNumberOfPomodoros } =
-    req.body;
+  let {
+    chosenTitle,
+    chosenDescription,
+    chosenColor,
+    chosenNumberOfPomodoros,
+    chosenMilestone,
+    noMilestone,
+  } = req.body;
   if (req.session.userId) {
     const existingProjects = await db
       .collection("projects")
@@ -466,7 +488,7 @@ app.post("/api/projects", async (req, res) => {
       .toArray();
     let number = existingProjects.length + 1;
 
-    await db.collection("projects").insertOne({
+    const result = await db.collection("projects").insertOne({
       _id: new ObjectId(),
       name: chosenTitle,
       userid: new ObjectId(req.session.userId),
@@ -476,6 +498,14 @@ app.post("/api/projects", async (req, res) => {
       number,
       completedPomodoros: 0,
     });
+    if (!noMilestone) {
+      await db.collection("milestones").insertOne({
+        _id: new ObjectId(),
+        projectid: result.insertedId,
+        title: chosenMilestone,
+        reached: false,
+      });
+    }
     return res.json({ projectedAdded: true });
   }
   return res.json({ projectedAdded: false });
